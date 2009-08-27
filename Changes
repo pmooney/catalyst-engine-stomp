@@ -1,8 +1,11 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+0.07  Thu Aug 27 22:37:46 2009
+    - Ability to set the message key used to dispatch
+      to a message-driven Controller action (Jason Tang)
     - Ability to add additional header key/value pairs to the
-      subscribe message sent to the message broker. (jason)
-    - Additional documentation (jason)
+      subscribe message sent to the message broker. (Jason Tang)
+    - Additional documentation (Jason Tang)
 
 0.06  Mon Jul 13 22:22:22 2009
     - Make the test-app harness available under CatalystX::
