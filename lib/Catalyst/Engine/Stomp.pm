@@ -193,6 +193,7 @@ sub handle_stomp_message {
     # ack the message off the queue now we've replied / processed
     $self->connection->ack( { frame => $frame } );
 }
+
 =head2 handle_stomp_error
 
 Log any Stomp error frames we receive.
