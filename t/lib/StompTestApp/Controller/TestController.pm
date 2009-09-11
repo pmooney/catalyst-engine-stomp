@@ -18,6 +18,12 @@ sub badaction : Local {
     die "oh noes";
 }
 
+sub throwerror : Local {
+    my ($self, $c, $request) = @_;
+    my $obj = bless {error => 'oh noes'}, 'StompTestApp::Error';
+    die $obj;
+}
+
 sub ping : Local {
     my ($self, $c, $request) = @_;
     if ($request->{type} eq 'ping') {
