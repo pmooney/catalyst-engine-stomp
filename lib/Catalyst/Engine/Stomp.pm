@@ -5,6 +5,7 @@ use HTTP::Request;
 use Net::Stomp;
 use MooseX::Types::Moose qw/Str Int HashRef/;
 use namespace::autoclean;
+use Encode;
 
 extends 'Catalyst::Engine::Embeddable';
 
@@ -30,6 +31,7 @@ Catalyst::Engine::Stomp - write message handling apps with Catalyst.
      'Engine::Stomp' = {
        hostname         => '127.0.0.1',
        port             => 61613,
+       utf8             => 1,
        subscribe_header => {
          transformation       => 'jms-to-json',
        }
@@ -62,6 +64,16 @@ Controllers are mapped to Stomp queues, and a controller base class is
 provided, Catalyst::Controller::MessageDriven, which implements
 YAML-serialized messages, mapping a top-level YAML "type" key to
 the action.
+
+=head1 UTF-8
+
+By default STOMP messages are assumed to be in UTF-8. This module can
+automatically convert a Perl string into a UTF-8 set of octets to be
+sent over the wire instead. This is a Good Thing, especially if you 
+use the function Load() from the package YAML::XS to un-serialize
+it in your client - it assumes it is in UTF-8.
+
+If you do want this behaviour, set 'utf8' to '1' in your config.
 
 =head1 METHODS
 
@@ -187,7 +199,13 @@ sub handle_stomp_message {
     # reply, if header set
     if (my $reply_to = $response->headers->header('X-Reply-Address')) {
         my $reply_queue = '/remote-temp-queue/' . $reply_to;
-        $self->connection->send({ destination => $reply_queue, body => $response->content });
+        my $content     = $response->content;
+
+        if ($config->{utf8}) {
+            $content = encode("utf8", $response->content); # create octets
+        }
+
+        $self->connection->send({ destination => $reply_queue, body => $content });
     }
 
     # ack the message off the queue now we've replied / processed
