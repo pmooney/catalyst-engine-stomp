@@ -1,5 +1,10 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+0.08  Thu Oct 29 17:00:00 2009
+    - Added ability to convert message to UTF-8 on output if flag set
+    - Added test to demonstrate Throwable error objects not being
+      passed up the stack correctly
+
 0.07  Thu Aug 27 22:37:46 2009
     - Ability to set the message key used to dispatch
       to a message-driven Controller action (Jason Tang)
