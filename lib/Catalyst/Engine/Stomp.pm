@@ -252,6 +252,8 @@ Tomas Doran (t0m) C<< <bobtfish@bobtfish.net> >>
 
 Jason Tang
 
+Paul Mooney
+
 =head1 LICENCE AND COPYRIGHT
 
 Copyright (C) 2009 Venda Ltd
