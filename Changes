@@ -1,5 +1,9 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+0.09  Fri Nov 27 17:00:00 2009
+    - If a single error is exists and it is blessed, that is serialized
+      and sent back to the user. Before it was stringyfied.
+
 0.08  Thu Oct 29 17:00:00 2009
     - Added ability to convert message to UTF-8 on output if flag set
     - Added test to demonstrate Throwable error objects not being
