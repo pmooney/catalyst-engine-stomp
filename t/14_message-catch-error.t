@@ -1,9 +1,9 @@
 use strict;
 use warnings;
-use Test::More tests => 5;
+use Test::More tests => 6;
 
 # If an Error in thrown in the code, is it caught and sent back to us
-# as a response, or is the 'die' passed through?
+# as a bless object in YAML form, or is it stringyfied into an error message
 #
 
 
@@ -15,10 +15,10 @@ BEGIN {
 };
 
 eval {
-	use JSON;
+	use YAML;
 };
 if ($@) {
-	plan 'skip_all' => 'JSON not installed, skipping JSON-format test';
+	plan 'skip_all' => 'YAML not installed, skipping message-catch-error test';
     exit;
 }
 
@@ -37,7 +37,7 @@ ok(!$res->is_success, 'unsuccessful response');
 my $response;
 
 eval {
-    $response = from_json($res->content);
+    $response = Load($res->content);
 };
 
 ok( ref($response) eq 'StompTestApp::Error', 'successful error thrown');

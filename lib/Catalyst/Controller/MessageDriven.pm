@@ -118,13 +118,22 @@ sub end : Private {
 
     # Custom error handler - steal errors from catalyst and dump them into
     # the stash, to get them serialized out as the reply.
-     if (scalar @{$c->error}) {
-        $c->log->error($_) for @{$c->error}; # Log errors in Catalyst
-        my $error = join "\n", @{$c->error};
-        $c->stash->{response} = { status => 'ERROR', error => $error };
-        $output = $s->serialize( $c->stash->{response} );
-        $c->clear_errors;
-        $c->response->status(400);
+    if (scalar @{$c->error}) {
+	
+	if ( scalar(@{$c->error}) == 1 && ref($c->error->[0]) ) {
+	    # A single object exists as an error, throw that back as is
+	    $c->stash->{response} = $c->error->[0];
+	    $output = $s->serialize( $c->error->[0] );
+	}
+	else {
+	    $c->log->error($_) for @{$c->error}; # Log errors in Catalyst
+	    my $error = join "\n", @{$c->error}; # Stringyfy them
+	    $c->stash->{response} = { status => 'ERROR', error => $error};
+	    $output = $s->serialize( $c->stash->{response} );
+	}
+
+	$c->clear_errors;
+	$c->response->status(400);
      }
 
     # Serialize the response
