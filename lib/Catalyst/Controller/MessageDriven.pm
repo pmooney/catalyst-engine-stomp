@@ -121,6 +121,7 @@ sub end : Private {
     if (scalar @{$c->error}) {
         if ( scalar(@{$c->error}) == 1 && ref($c->error->[0]) ) {
           # A single object exists as an error, throw that back as is
+          $c->log->error('Exception thrown: ' . $c->error->[0]);
           $c->stash->{response} = $c->error->[0];
           $output = $s->serialize( $c->error->[0] );
         }
