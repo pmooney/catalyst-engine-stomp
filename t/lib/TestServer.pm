@@ -44,8 +44,14 @@ sub start_server {
     $SIG{CHLD} = 'IGNORE';
     unless (fork()) {
         my $libs = join(' ', map { "-I$_" } @INC);
-	    system("$^X $libs $FindBin::Bin/script/stomptestapp_stomp.pl --oneshot");
-	    exit 0;
+        system("$^X $libs $FindBin::Bin/script/stomptestapp_stomp.pl --oneshot");
+
+        # Let our tests complete - we need to sleep here otherwise we get a timing issue
+        # problem which I don't fully understand. Without it, sometimes the test works,
+        # somethimes it doesn't!
+        sleep 2;
+
+        exit 0;
     }
     print STDERR "server started, waiting for spinup...";
     sleep 20;

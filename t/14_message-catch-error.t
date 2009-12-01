@@ -1,26 +1,30 @@
 use strict;
 use warnings;
-use Test::More tests => 6;
+use Test::More;
 
 # If an Error in thrown in the code, is it caught and sent back to us
 # as a bless object in YAML form, or is it stringyfied into an error message
 #
 
-
 use FindBin;
 use lib "$FindBin::Bin/lib";
 
 BEGIN {
+    eval {
+        require YAML;
+        YAML->import('Load', 'Dump')
+    };
+    if ($@) {
+	plan 'skip_all' => 'YAML not installed, skipping message-catch-error test';
+        exit;
+    }
+}
+
+BEGIN {
+    plan tests => 6;
     use_ok 'CatalystX::Test::MessageDriven', 'StompTestApp' or die;
 };
 
-eval {
-	use YAML;
-};
-if ($@) {
-	plan 'skip_all' => 'YAML not installed, skipping message-catch-error test';
-    exit;
-}
 
 # successful request - type is minimum attributes
 my $req = "---\ntype: ping\n";
