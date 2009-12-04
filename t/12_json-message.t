@@ -7,12 +7,15 @@ use Test::More;
 # distro and run its out-of-the-box config.
 
 eval {
-	use JSON;
+    require JSON;
+    YAML->import();
 };
 if ($@) {
-	plan 'skip_all' => 'JSON not installed, skipping JSON-format test';
+    plan 'skip_all' => 'JSON not installed, skipping json_message test';
     exit;
 }
+
+
 
 use FindBin;
 use lib "$FindBin::Bin/lib";
