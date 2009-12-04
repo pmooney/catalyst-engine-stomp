@@ -1,5 +1,9 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+
+0.11  Tue Dec  4 16:30:00 2009
+    - Really really fix the tests this time
+
 0.10  Tue Dec  1 16:00:00 2009
     - Fixed tests _only_ to allow for cleaner install
 
