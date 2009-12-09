@@ -1,7 +1,10 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+0.12  Tue Dec  7 17:45
+    - The raw request (in say YAML) is kept in $c->stash->{raw_request}
+      which is useful for debugging/logging
 
-0.11  Tue Dec  4 16:30:00 2009
+0.11  Fri Dec  4 16:30:00 2009
     - Really really fix the tests this time
 
 0.10  Tue Dec  1 16:00:00 2009

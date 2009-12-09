@@ -93,7 +93,9 @@ sub begin : Private {
     eval {
         my $body = $c->request->body;
         open my $IN, "$body" or die "can't open temp file $body";
-        $message = $s->raw_deserialize(do { local $/; <$IN> });
+        my $raw_request = do { local $/; <$IN> };
+        $c->stash->{raw_request} = $raw_request;
+        $message = $s->raw_deserialize($raw_request);
     };
     if ($@) {
         # can't reply - reply_to is embedded in the message
