@@ -8,7 +8,7 @@ use Test::More;
 
 eval {
     require JSON;
-    YAML->import();
+    JSON->import();
 };
 if ($@) {
     plan 'skip_all' => 'JSON not installed, skipping json_message test';
