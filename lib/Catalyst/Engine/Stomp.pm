@@ -9,7 +9,7 @@ use Encode;
 
 extends 'Catalyst::Engine::Embeddable';
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 has connection => (is => 'rw', isa => 'Net::Stomp');
 has conn_desc => (is => 'rw', isa => Str);
