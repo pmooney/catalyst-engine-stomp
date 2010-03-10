@@ -79,6 +79,8 @@ If you do want this behaviour, set 'utf8' to '1' in your config.
 
 =head2 _see_ya
 
+Set to run when signal USR1 is received. Simply sets the stop flag.
+
 =cut
 
 my $stop = 0;
@@ -93,6 +95,10 @@ sub _see_ya {
 =head2 run
 
 App entry point. Starts a loop listening for messages.
+
+If the stop flag is set (see _see_ya above) then no more requests are processed.
+Keep in mind this is a blocking server and it will wait for a STOMP message forever.
+Only after handling a request does it check the flag.
 
 =cut
 

@@ -1,5 +1,9 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+0.13  Wed 10 Mar 16:45
+    - Added ability to send signal USR1 to the Catalyst app so no more
+      requests are handled and it exists.
+
 0.12  Tue Dec  7 17:45
     - The raw request (in say YAML) is kept in $c->stash->{raw_request}
       which is useful for debugging/logging
