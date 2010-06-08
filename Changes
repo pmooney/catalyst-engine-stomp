@@ -1,5 +1,9 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+0.14  Tue  8 Jue 17:00
+    - More than one stomp server can be specified so a client can
+      failover to the next server in the list
+
 0.13  Wed 10 Mar 16:45
     - Added ability to send signal USR1 to the Catalyst app so no more
       requests are handled and it exists.
