@@ -90,7 +90,6 @@ sub _see_ya {
     delete $SIG{'USR1'};
 }
 
-=pod
 
 =head2 run
 
@@ -103,47 +102,47 @@ Only after handling a request does it check the flag.
 =cut
 
 sub run {
-        my ($self, $app, $oneshot) = @_;
+    my ($self, $app, $oneshot) = @_;
 
-        $SIG{'USR1'} = \&_see_ya;
+    $SIG{'USR1'} = \&_see_ya;
 
-        die 'No Engine::Stomp configuration found'
-             unless ref $app->config->{'Engine::Stomp'} eq 'HASH';
+    die 'No Engine::Stomp configuration found'
+        unless ref $app->config->{'Engine::Stomp'} eq 'HASH';
 
-        my @queues = grep { length $_ }
-                     map  { $app->controller($_)->action_namespace } $app->controllers;
+    my @queues = grep { length $_ }
+                 map  { $app->controller($_)->action_namespace } $app->controllers;
 
-        # connect up
-        my %template = %{$app->config->{'Engine::Stomp'}};
-        my $subscribe_headers = $template{subscribe_headers} || {};
-        die("subscribe_headers config for Engine::Stomp must be a hashref!\n")
-            if (ref($subscribe_headers) ne 'HASH');
+    # connect up
+    my %template = %{$app->config->{'Engine::Stomp'}};
+    my $subscribe_headers = $template{subscribe_headers} || {};
+    die("subscribe_headers config for Engine::Stomp must be a hashref!\n")
+        if (ref($subscribe_headers) ne 'HASH');
 
-        $self->connection(Net::Stomp->new(\%template));
-        $self->connection->connect();
-        $self->conn_desc($template{hostname}.':'.$template{port});
+    $self->connection(Net::Stomp->new(\%template));
+    $self->connection->connect();
+    $self->conn_desc($template{hostname}.':'.$template{port});
 
-        # subscribe, with client ack.
-        foreach my $queue (@queues) {
-                my $queue_name = "/queue/$queue";
-                $self->connection->subscribe({
-                    %$subscribe_headers,
-                    destination => $queue_name,
-                    ack         => 'client',
-                });
-        }
+    # subscribe, with client ack.
+    foreach my $queue (@queues) {
+        my $queue_name = "/queue/$queue";
+        $self->connection->subscribe({
+            %$subscribe_headers,
+            destination => $queue_name,
+            ack         => 'client',
+        });
+    }
 
-	# Since we might block for some time, lets flush the log messages
-        $app->log->_flush() if $app->log->can('_flush');
+    # Since we might block for some time, lets flush the log messages
+    $app->log->_flush() if $app->log->can('_flush');
 
-        # enter loop...
-        while (1) {
-                my $frame = $self->connection->receive_frame(); # block
-                $self->handle_stomp_frame($app, $frame);
+    # enter loop...
+    while (1) {
+        my $frame = $self->connection->receive_frame(); # block
+        $self->handle_stomp_frame($app, $frame);
 
-                last if $ENV{ENGINE_ONESHOT};
-                last if $stop;
-        }
+        last if $ENV{ENGINE_ONESHOT};
+        last if $stop;
+    }
 }
 
 =head2 prepare_request
