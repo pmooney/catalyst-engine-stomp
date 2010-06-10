@@ -320,7 +320,7 @@ message broker.
 
 The source to Catalyst::Engine::Stomp is in github:
 
-  http://github.com/chrisa/catalyst-engine-stomp
+  http://github.com/pmooney/catalyst-engine-stomp
 
 =head1 AUTHOR
 
