@@ -135,6 +135,7 @@ sub run {
     my $config = $app->config->{'Engine::Stomp'};
     my $index  = 0;
 
+    QUITLOOP:
     while (1) {
         # Go to next server in list
         my %template = %{ $config->{servers}->[$index] };
@@ -157,7 +158,7 @@ sub run {
                 die("subscribe_headers config for Engine::Stomp must be a hashref!\n")
                     if (ref($subscribe_headers) ne 'HASH');
 
-                $app->log->debug("Connecting to " . $template{hostname}.':'.$template{port});
+                $app->log->info("Connecting to STOMP Q at " . $template{hostname}.':'.$template{port});
 
                 $self->connection(Net::Stomp->new(\%template));
                 $self->connection->connect();
@@ -181,13 +182,20 @@ sub run {
                     my $frame = $self->connection->receive_frame(); # block
                     $self->handle_stomp_frame($app, $frame);
             
-                    last if $ENV{ENGINE_ONESHOT};
-                    last if $stop;
+                    if ( $ENV{ENGINE_ONESHOT} || $stop ){
+                        # Perl does not like 'last QUITLOOP' inside an eval, hence we die and do it
+                        die "QUITLOOP\n";
+                    }
                 }
             };
-        
+
             if ($@) {
-                $app->log->error(" Problem dealing with STOMP : $@");
+                if ($@ eq "QUITLOOP\n") {
+                    last QUITLOOP;
+                }
+                else {
+                    $app->log->error(" Problem dealing with STOMP : $@");
+                }
             }
         }
     }
