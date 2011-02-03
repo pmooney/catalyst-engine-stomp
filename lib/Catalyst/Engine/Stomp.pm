@@ -94,6 +94,33 @@ it in your client - it assumes it is in UTF-8.
 
 If you do want this behaviour, set 'utf8' to '1' in your config.
 
+=head1 Simplified configuration
+
+Instead of using the complete config layout as shown in the synopsis,
+you can
+
+=over 4
+
+=item *
+
+not specify a C<tries_per_server> (defaults to 1)
+
+=item *
+
+specify a single server:
+
+  server => { hostname => $host, port => $port }
+
+=item *
+
+use the old-style (pre 0.14) config having C<hostname> and C<port>
+directly in the C<Engine::Stomp> block, without a C<server> key in
+between.
+
+=back
+
+=cut
+
 =head1 METHODS
 
 =head2 _see_ya
@@ -134,6 +161,18 @@ sub run {
     # connect up
     my $config = $app->config->{'Engine::Stomp'};
     my $index  = 0;
+
+    # munge the configuration to make it easier to write
+    $config->{tries_per_server} ||= 1;
+    if (! $config->{servers} ) {
+        $config->{servers} = [ {
+            hostname => (delete $config->{hostname}),
+            port => (delete $config->{port}),
+        } ];
+    }
+    elsif (ref $config->{servers} eq 'HASH') {
+        $config->{servers} = [ $config->{servers} ];
+    }
 
     QUITLOOP:
     while (1) {

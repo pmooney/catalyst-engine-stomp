@@ -44,6 +44,7 @@ sub start_server {
     $SIG{CHLD} = 'IGNORE';
     unless (fork()) {
         my $libs = join(' ', map { "-I$_" } @INC);
+        $ENV{CATALYST_CONFIG}=shift if @_;
         system("$^X $libs $FindBin::Bin/script/stomptestapp_stomp.pl --oneshot");
 
         # Let our tests complete - we need to sleep here otherwise we get a timing issue
