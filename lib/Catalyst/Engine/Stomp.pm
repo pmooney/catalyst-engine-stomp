@@ -155,7 +155,7 @@ sub run {
     die 'No Engine::Stomp configuration found'
         unless ref $app->config->{'Engine::Stomp'} eq 'HASH';
 
-    my @queues = grep { length $_ }
+    my @queues = uniq grep { length $_ }
                  map  { $app->controller($_)->action_namespace } $app->controllers;
 
     # connect up
