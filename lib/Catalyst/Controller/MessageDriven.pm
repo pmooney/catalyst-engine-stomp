@@ -125,13 +125,11 @@ sub end : Private {
           # A single object exists as an error, throw that back as is
           $c->log->error('Exception thrown: ' . $c->error->[0]);
           $c->stash->{response} = $c->error->[0];
-          $output = $s->serialize( $c->error->[0] );
         }
         else {
           $c->log->error($_) for @{$c->error}; # Log errors in Catalyst
           my $error = join "\n", @{$c->error}; # Stringyfy them
           $c->stash->{response} = { status => 'ERROR', error => $error};
-          $output = $s->serialize( $c->stash->{response} );
         }
 
         $c->clear_errors;
