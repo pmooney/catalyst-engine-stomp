@@ -106,6 +106,23 @@ sub begin : Private {
     }
 }
 
+sub _errors_to_response {
+    my ($self, $c) = @_;
+
+    if ( scalar(@{$c->error}) == 1 && ref($c->error->[0]) ) {
+        # A single object exists as an error, throw that back as is
+        $c->log->error('Exception thrown: ' . $c->error->[0]);
+        return $c->error->[0];
+    }
+    else {
+        $c->log->error($_) for @{$c->error}; # Log errors in Catalyst
+        my $error = join "\n", @{$c->error}; # Stringyfy them
+        return { status => 'ERROR', error => $error};
+    }
+
+    return;
+}
+
 sub end : Private {
     my ($self, $c) = @_;
 
@@ -121,17 +138,7 @@ sub end : Private {
     # Custom error handler - steal errors from catalyst and dump them into
     # the stash, to get them serialized out as the reply.
     if (scalar @{$c->error}) {
-        if ( scalar(@{$c->error}) == 1 && ref($c->error->[0]) ) {
-          # A single object exists as an error, throw that back as is
-          $c->log->error('Exception thrown: ' . $c->error->[0]);
-          $c->stash->{response} = $c->error->[0];
-        }
-        else {
-          $c->log->error($_) for @{$c->error}; # Log errors in Catalyst
-          my $error = join "\n", @{$c->error}; # Stringyfy them
-          $c->stash->{response} = { status => 'ERROR', error => $error};
-        }
-
+        $c->stash->{response} = $self->_errors_to_response($c);
         $c->clear_errors;
         $c->response->status(400);
     }
