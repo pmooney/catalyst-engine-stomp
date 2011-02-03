@@ -54,5 +54,6 @@ my $response = from_json($reply_frame->body);
 ok($response, 'JSON response ok');
 ok($response->{type} eq 'testaction_response', 'correct type');
 
-ok($stomp->disconnect, 'disconnected');
+$stomp->disconnect;
+ok(!$stomp->socket->connected, 'disconnected');
 

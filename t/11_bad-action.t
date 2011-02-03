@@ -47,5 +47,5 @@ ok($response, 'YAML response ok');
 ok($response->{status} eq 'ERROR', 'is an error');
 ok($response->{error} =~ /oh noes/);
 
-ok($stomp->disconnect, 'disconnected');
-
+$stomp->disconnect;
+ok(!$stomp->socket->connected, 'disconnected');

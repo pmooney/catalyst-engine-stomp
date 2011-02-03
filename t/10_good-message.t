@@ -46,5 +46,6 @@ my $response = Load($reply_frame->body);
 ok($response, 'YAML response ok');
 ok($response->{type} eq 'testaction_response', 'correct type');
 
-ok($stomp->disconnect, 'disconnected');
+$stomp->disconnect;
+ok(!$stomp->socket->connected, 'disconnected');
 

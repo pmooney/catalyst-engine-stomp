@@ -85,4 +85,5 @@ ok($new_string eq $text_string,
    "utf8 for text_string : " . Encode::is_utf8($text_string) . "\n"  );
 
 
-ok($stomp->disconnect, 'disconnected');
+$stomp->disconnect;
+ok(!$stomp->socket->connected, 'disconnected');
