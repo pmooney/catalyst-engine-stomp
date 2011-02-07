@@ -21,6 +21,7 @@ requires 'MooseX::Types' => undef;
 requires 'MooseX::Workers' => '0.05';
 requires 'Net::Stomp' => '0.34';
 requires 'YAML::XS' => '0.32';
+requires 'YAML' => undef;
 requires 'Data::Serializer' => '0.49';
 requires 'namespace::autoclean' => '0.05';
 

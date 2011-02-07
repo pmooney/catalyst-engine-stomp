@@ -1,5 +1,11 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+0.15  Mon  7 Feb 14:00 2011
+    - Thanks to dakkar for:
+    - Config option tries_per_server is now optional
+    - Only join a queue once even if specified twice!
+    - Code tidy
+
 0.14  Tue  8 Jue 17:00
     - More than one stomp server can be specified so a client can
       failover to the next server in the list

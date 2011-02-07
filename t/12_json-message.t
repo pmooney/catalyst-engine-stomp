@@ -4,7 +4,7 @@ use Test::More;
 
 # Tests which expect a STOMP server like ActiveMQ to exist on
 # localhost:61613, which is what you get if you just get the ActiveMQ
-# distro and run its out-of-the-box config.
+# distro and change its config.
 
 eval {
     require JSON;
