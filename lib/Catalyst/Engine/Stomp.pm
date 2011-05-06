@@ -228,12 +228,17 @@ sub run {
                 }
             };
 
-            if ($@) {
-                if ($@ eq "QUITLOOP\n") {
+            if (my $err=$@) {
+                # although it looks like a lot of pointless flush()ing we need
+                # to make sure the user(s) can see any new messages; we
+                # sometimes die before we flush() in the loop above
+
+                if ($err eq "QUITLOOP\n") {
                     last QUITLOOP;
                 }
                 else {
-                    $app->log->error(" Problem dealing with STOMP : $@");
+                    $app->log->error(" Problem dealing with STOMP : $err");
+                    $app->log->_flush() if $app->log->can('_flush');
                 }
             }
         }
