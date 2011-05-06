@@ -164,6 +164,7 @@ sub run {
 
     # munge the configuration to make it easier to write
     $config->{tries_per_server} ||= 1;
+    $config->{connect_retry_delay} ||= 15;
     if (! $config->{servers} ) {
         $config->{servers} = [ {
             hostname => (delete $config->{hostname}),
@@ -239,6 +240,18 @@ sub run {
                 else {
                     $app->log->error(" Problem dealing with STOMP : $err");
                     $app->log->_flush() if $app->log->can('_flush');
+                }
+
+                # don't loop continuously if we can't connect; take a break;
+                # give the service a chance to come back
+                if ($err =~ m{Connection refused}) {
+                    $app->log->info(
+                          'Unable to connect to '
+                        . $template{hostname}.':'.$template{port}
+                        . '; sleeping before next retry'
+                    );
+                    $app->log->_flush() if $app->log->can('_flush');
+                    sleep $config->{connect_retry_delay};
                 }
             }
         }
