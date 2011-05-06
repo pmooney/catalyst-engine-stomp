@@ -1,5 +1,9 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+0.16  Fri  6 May 16:00 2011
+    - Thanks to chiselwright for flushing the logs when an error is thrown
+      and not using 100% CPU when unable to connect.
+
 0.15  Mon  7 Feb 14:00 2011
     - Thanks to dakkar for:
     - Config option tries_per_server is now optional
