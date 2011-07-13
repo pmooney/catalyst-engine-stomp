@@ -13,6 +13,7 @@ our $VERSION = '0.16';
 
 has connection => (is => 'rw', isa => 'Net::Stomp');
 has conn_desc => (is => 'rw', isa => Str);
+has destination_namespace_map => (is => 'rw', isa => HashRef, default => sub { { } } );
 
 =head1 NAME
 
@@ -39,8 +40,9 @@ Catalyst::Engine::Stomp - write message handling apps with Catalyst.
          'hostname' => 'stomp.yourmachine.com',
          'port' => '61613'
        },
+       ],
        utf8             => 1,
-       subscribe_header => {
+       subscribe_headers => {
          transformation       => 'jms-to-json',
        }
     },
@@ -68,10 +70,33 @@ This is single-threaded and single process - you need to run multiple
 instances of this engine to get concurrency, and configure your broker
 to load-balance across multiple consumers of the same queue.
 
-Controllers are mapped to Stomp queues, and a controller base class is
-provided, Catalyst::Controller::MessageDriven, which implements
-YAML-serialized messages, mapping a top-level YAML "type" key to
-the action.
+Controllers are mapped to Stomp queues or topics, and a controller
+base class is provided, Catalyst::Controller::MessageDriven, which
+implements YAML-serialized messages, mapping a top-level YAML "type"
+key to the action.
+
+=head1 QUEUES and TOPICS
+
+The controller namespace (either derived from its name, or defined by
+its C<action_namespace> attribute) defines what the controller is
+subscribed to:
+
+=over 4
+
+=item C<queue/foo>
+
+subscribes to the queue called C<foo>
+
+=item C<topic/foo>
+
+subscribes to the topic called C<foo>
+
+=item C<foo>
+
+subscribes to the queue called C<foo> (for simplicity and backward
+compatibility)
+
+=back
 
 =head1 FAILOVER
 
@@ -147,6 +172,24 @@ Only after handling a request does it check the flag.
 
 =cut
 
+sub _qualify_destination {
+    my ($self,$dest) = @_;
+
+    my $ret = $dest;
+    if ($dest !~ m{^ /? (?: queue | topic ) / }x) {
+        $ret = "/queue/$dest";
+    }
+
+    # normalize slashes
+    $dest =~ s{^/}{};
+    $ret =~ s{/+}{/};
+    $ret = "/$ret" unless $ret =~ m{^/};
+
+    $self->destination_namespace_map->{$ret} = $dest;
+
+    return $ret;
+}
+
 sub run {
     my ($self, $app, $oneshot) = @_;
 
@@ -155,8 +198,12 @@ sub run {
     die 'No Engine::Stomp configuration found'
         unless ref $app->config->{'Engine::Stomp'} eq 'HASH';
 
-    my @queues = uniq grep { length $_ }
-                 map  { $app->controller($_)->action_namespace } $app->controllers;
+    my @destinations =
+        uniq
+        map { $self->_qualify_destination($_) }
+        grep { length $_ }
+        map  { $app->controller($_)->action_namespace }
+        $app->controllers;
 
     # connect up
     my $config = $app->config->{'Engine::Stomp'};
@@ -165,6 +212,10 @@ sub run {
     # munge the configuration to make it easier to write
     $config->{tries_per_server} ||= 1;
     $config->{connect_retry_delay} ||= 15;
+    $config->{subscribe_headers} ||= {};
+    die("subscribe_headers config for Engine::Stomp must be a hashref!\n")
+        if (ref($config->{subscribe_headers}) ne 'HASH');
+
     if (! $config->{servers} ) {
         $config->{servers} = [ {
             hostname => (delete $config->{hostname}),
@@ -192,11 +243,16 @@ sub run {
 
         while ($tries < $config->{tries_per_server}) {
             ++$tries;
-    
+
             eval {
-                my $subscribe_headers = $template{subscribe_headers} || {};
-                die("subscribe_headers config for Engine::Stomp must be a hashref!\n")
-                    if (ref($subscribe_headers) ne 'HASH');
+                $template{subscribe_headers} ||= {};
+                die("subscribe_headers config for server $config->{hostname}:$config->{port} in Engine::Stomp must be a hashref!\n")
+                    if (ref($template{subscribe_headers}) ne 'HASH');
+
+                my $subscribe_headers = {
+                    %{$config->{subscribe_headers}},
+                    %{$template{subscribe_headers}},
+                };
 
                 $app->log->info("Connecting to STOMP Q at " . $template{hostname}.':'.$template{port});
 
@@ -205,11 +261,16 @@ sub run {
                 $self->conn_desc($template{hostname}.':'.$template{port});
 
                 # subscribe, with client ack.
-                foreach my $queue (@queues) {
-                    my $queue_name = "/queue/$queue";
+                foreach my $destination (@destinations) {
+                    $app->log->info(
+                        "subscribing to $destination",
+                        'which is mapped to',
+                        $self->destination_namespace_map->{$destination},
+                    );
+
                     $self->connection->subscribe({
                         %$subscribe_headers,
-                        destination => $queue_name,
+                        destination => $destination,
                         ack         => 'client',
                     });
                 }
@@ -318,9 +379,9 @@ Dispatch a Stomp message into the Catalyst app.
 sub handle_stomp_message {
     my ($self, $app, $frame) = @_;
 
-    # queue -> controller
-    my $queue = $frame->headers->{destination};
-    my ($controller) = $queue =~ m|^/queue/(.*)$|;
+    # destination -> controller
+    my $destination = $frame->headers->{destination};
+    my ($controller) = $self->destination_namespace_map->{$destination};
 
     # set up request
     my $config = $app->config->{'Engine::Stomp'};
@@ -345,7 +406,7 @@ sub handle_stomp_message {
         $self->connection->send({ destination => $reply_queue, body => $content });
     }
 
-    # ack the message off the queue now we've replied / processed
+    # ack the message off the destination now we've replied / processed
     $self->connection->ack( { frame => $frame } );
 }
 

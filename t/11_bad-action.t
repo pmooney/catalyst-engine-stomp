@@ -13,39 +13,53 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 use TestServer;
 
-my $stomp = start_server();
+plan tests => 24;
 
-plan tests => 12;
+sub test_it {
+    my ($destination) = @_;
 
-my $frame = $stomp->connect();
-ok($frame, 'connect to MQ server ok');
+    my $stomp = start_server();
 
-my $reply_to = sprintf '%s:1', $frame->headers->{session};
-ok($frame->headers->{session}, 'got a session');
-ok(length $reply_to > 2, 'valid-looking reply_to queue');
+    my $frame = $stomp->connect();
+    ok($frame, 'connect to MQ server ok');
 
-ok($stomp->subscribe( { destination => '/temp-queue/reply' } ), 'subscribe to temp queue');
+    my $reply_to = sprintf '%s:1', $frame->headers->{session};
+    ok($frame->headers->{session}, 'got a session');
+    ok(length $reply_to > 2, 'valid-looking reply_to queue');
 
-# Test what happens when the action crashes
-my $message = {
-	       payload => { foo => 1, bar => 2 },
-	       reply_to => $reply_to,
-	       type => 'badaction',
-	      };
-my $text = Dump($message);
-ok($text, 'compose message for badaction');
+    ok($stomp->subscribe( {
+        destination => '/temp-queue/reply'
+    } ),
+       'subscribe to temp queue');
 
-$stomp->send( { destination => '/queue/testcontroller', body => $text } );
+    # Test what happens when the action crashes
+    my $message = {
+        payload => { foo => 1, bar => 2 },
+        reply_to => $reply_to,
+        type => 'badaction',
+    };
+    my $text = Dump($message);
+    ok($text, 'compose message for badaction');
 
-my $reply_frame = $stomp->receive_frame();
-ok($reply_frame, 'got a reply');
-ok($reply_frame->headers->{destination} eq "/remote-temp-queue/$reply_to", 'came to correct temp queue');
-ok($reply_frame->body, 'has a body');
+    $stomp->send( { destination => $destination, body => $text } );
 
-my $response = Load($reply_frame->body);
-ok($response, 'YAML response ok');
-ok($response->{status} eq 'ERROR', 'is an error');
-ok($response->{error} =~ /oh noes/);
+    my $reply_frame = $stomp->receive_frame();
+    ok($reply_frame, 'got a reply');
+    is($reply_frame->headers->{destination},
+       "/remote-temp-queue/$reply_to",
+       'came to correct temp queue');
+    ok($reply_frame->body, 'has a body');
 
-$stomp->disconnect;
-ok(!$stomp->socket->connected, 'disconnected');
+    my $response = Load($reply_frame->body);
+    ok($response, 'YAML response ok');
+    ok($response->{status} eq 'ERROR', 'is an error');
+    like($response->{error},qr{oh noes});
+
+    $stomp->disconnect;
+    ok(!$stomp->socket->connected, 'disconnected');
+}
+
+note 'testing queues';
+test_it('/queue/testcontroller');
+note 'testing topics';
+test_it('/topic/testcontroller');
