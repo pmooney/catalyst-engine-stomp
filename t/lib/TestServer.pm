@@ -54,7 +54,7 @@ sub start_server {
 
         exit 0;
     }
-    print STDERR "server started, waiting for spinup...";
+    diag "server started, waiting for spinup...";
     sleep 20;
 
     $stomp->{___activemq} = $mq if $mq;
