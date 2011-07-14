@@ -55,7 +55,7 @@ sub start_server {
         exit 0;
     }
     diag "server started, waiting for spinup...";
-    sleep 20;
+    sleep($ENV{NET_STOMP_DELAY}||20);
 
     $stomp->{___activemq} = $mq if $mq;
     StompRole->meta->apply($stomp);
