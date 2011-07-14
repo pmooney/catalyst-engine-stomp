@@ -565,7 +565,8 @@ sub handle_stomp_message {
     # set up request
     my $config = $app->config->{'Engine::Stomp'};
     my $url = 'stomp://'.$config->{hostname}.':'.$config->{port}.'/'.$controller;
-    my $req = HTTP::Request->new(POST => $url);
+    my $request_headers = HTTP::Headers->new(%{$frame->headers});
+    my $req = HTTP::Request->new(POST => $url, $request_headers);
     $req->content($frame->body);
     $req->content_length(length $frame->body);
 
@@ -582,7 +583,20 @@ sub handle_stomp_message {
             $content = encode("utf8", $response->content); # create octets
         }
 
-        $self->connection->send({ destination => $reply_queue, body => $content });
+        my $reply_headers = $response->headers->clone;
+        $reply_headers->remove_content_headers;
+        my %reply_hh =
+            map {
+                lc($_), scalar($reply_headers->header($_)),
+            }
+            grep { !/^X-/i }
+            $reply_headers->header_field_names();
+
+        $self->connection->send({
+            %reply_hh,
+            destination => $reply_queue,
+            body => $content
+        });
     }
 
     # ack the message off the destination now we've replied / processed
