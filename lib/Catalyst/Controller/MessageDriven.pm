@@ -83,6 +83,11 @@ has type_key => (
     default => 'type',
 );
 
+has trust_jmstype => (
+    is => 'ro', required => 1,
+    default => 0,
+);
+
 
 sub begin : Private {
     my ($self, $c) = @_;
@@ -155,6 +160,7 @@ sub end : Private {
     }
 
     $c->response->output( $output );
+
 }
 
 sub default : Private {
@@ -162,9 +168,17 @@ sub default : Private {
 
     # Forward the request to the appropriate action, based on the
     # message type.
-    my $action = $c->stash->{request}->{ $self->type_key };
+    my $action;
+    if ( !defined $self->type_key
+             or $self->trust_jmstype ) {
+        $action = $c->request->headers->header('JMSType')
+               || $c->request->headers->header('type');
+    }
+    else {
+        $action = $c->stash->{request}->{ $self->type_key };
+    }
     if (defined $action) {
-        $c->forward($action, [$c->stash->{request}]);
+        $c->forward($action, [$c->stash->{request},$c->request->headers]);
     }
     else {
          $c->error('no message type specified');
