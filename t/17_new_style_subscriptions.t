@@ -4,8 +4,9 @@ use Test::More;
 
 # Tests which expect a STOMP server like ActiveMQ to exist on
 # localhost:61613, which is what you get if you just get the ActiveMQ
-# distro and change its config.
+# distro and changes its config.
 
+use Net::Stomp;
 use YAML::XS qw/ Dump Load /;
 use Data::Dumper;
 
@@ -13,10 +14,10 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 use TestServer;
 
-plan tests => 24;
+#plan tests => 24;
 
 sub test_it {
-    my ($destination) = @_;
+    my ($type,$value) = @_;
 
     my $stomp = start_server();
 
@@ -32,16 +33,20 @@ sub test_it {
     } ),
        'subscribe to temp queue');
 
-    # Test what happens when the action crashes
     my $message = {
         payload => { foo => 1, bar => 2 },
         reply_to => $reply_to,
-        type => 'badaction',
+        type => $type,
     };
     my $text = Dump($message);
-    ok($text, 'compose message for badaction');
+    ok($text, 'compose message');
 
-    $stomp->send( { destination => $destination, body => $text } );
+    $stomp->send( {
+        destination => '/queue/newstyle',
+        'custom_header' => $value,
+        JMSType => $type,
+        body => $text,
+    } );
 
     my $reply_frame = $stomp->receive_frame();
     ok($reply_frame, 'got a reply');
@@ -52,14 +57,25 @@ sub test_it {
 
     my $response = Load($reply_frame->body);
     ok($response, 'YAML response ok');
-    ok($response->{status} eq 'ERROR', 'is an error');
-    like($response->{error},qr{oh noes});
+    is($response->{type},
+       "${type}_response",
+       'correct type');
+    is($response->{from},
+       "newstyle$value",
+       'correct controller');
 
     $stomp->disconnect;
     ok(!$stomp->socket->connected, 'disconnected');
 }
 
-note 'testing queues';
-test_it('/queue/testcontroller');
-note 'testing topics';
-test_it('/topic/testcontroller');
+note 'testing 1';
+test_it('testaction','1');
+note 'testing 2';
+test_it('testaction','2');
+
+note 'testing foo';
+test_it('test_foo','1');
+note 'testing bar';
+test_it('test_bar','2');
+
+done_testing();

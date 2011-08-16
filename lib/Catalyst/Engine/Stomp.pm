@@ -13,6 +13,7 @@ our $VERSION = '0.16';
 
 has connection => (is => 'rw', isa => 'Net::Stomp');
 has conn_desc => (is => 'rw', isa => Str);
+has destination_namespace_map => (is => 'rw', isa => HashRef, default => sub { { } } );
 
 =head1 NAME
 
@@ -34,13 +35,18 @@ Catalyst::Engine::Stomp - write message handling apps with Catalyst.
        {
          'hostname' => 'localhost',
          'port' => '61613'
+         connect_headers => {
+           login => 'myuser',
+           passcode => 'mypassword',
+         },
        },
        {
          'hostname' => 'stomp.yourmachine.com',
          'port' => '61613'
        },
+       ],
        utf8             => 1,
-       subscribe_header => {
+       subscribe_headers => {
          transformation       => 'jms-to-json',
        }
     },
@@ -68,10 +74,161 @@ This is single-threaded and single process - you need to run multiple
 instances of this engine to get concurrency, and configure your broker
 to load-balance across multiple consumers of the same queue.
 
-Controllers are mapped to Stomp queues, and a controller base class is
-provided, Catalyst::Controller::MessageDriven, which implements
-YAML-serialized messages, mapping a top-level YAML "type" key to
-the action.
+Controllers are mapped to Stomp queues or topics, and a controller
+base class is provided, Catalyst::Controller::MessageDriven, which
+implements YAML-serialized messages, mapping a top-level YAML "type"
+key to the action.
+
+=head1 QUEUES and TOPICS
+
+The controller namespace (either derived from its name, or defined by
+its C<action_namespace> attribute) defines what the controller is
+subscribed to:
+
+=over 4
+
+=item C<queue/foo>
+
+subscribes to the queue called C<foo>
+
+=item C<topic/foo>
+
+subscribes to the topic called C<foo>
+
+=item C<foo>
+
+subscribes to the queue called C<foo> (for simplicity and backward
+compatibility)
+
+=back
+
+=head2 Connction and Subscription Headers
+
+You can specify custom headers to send with the C<CONNECT> and
+C<SUBSCRIBE> STOMP messages. You can specify them globally:
+
+  MyApp->config(
+    Engine::Stomp' = {
+      'servers' => [
+       {
+         'hostname' => 'localhost',
+         'port' => '61613'
+       },
+       ],
+       subscribe_headers => {
+         transformation       => 'jms-to-json',
+       },
+       connect_headers => {
+         login => 'myuser',
+         passcode => 'mypassword',
+       },
+    },
+  );
+
+per server:
+
+  MyApp->config(
+    Engine::Stomp' = {
+      'servers' => [
+       {
+         'hostname' => 'localhost',
+         'port' => '61613'
+         subscribe_headers => {
+           strange_stuff => 'something',
+         },
+         connect_headers => {
+           login => 'myuser',
+           passcode => 'mypassword',
+         },
+       },
+       ],
+    },
+  );
+
+or per-controller (subscribe headers only):
+
+  package MyApp::Controller::Special;
+  use Moose;
+  BEGIN { extends 'Catalyst::Controller::MessageDriven' };
+
+  has stomp_destination => (
+    is => 'ro',
+    isa => 'Str',
+    default => '/topic/crowded',
+  );
+
+  has stomp_subscribe_headers => (
+    is => 'ro',
+    isa => 'HashRef',
+    default => sub { +{
+        selector => q{custom_header = '1' or JMSType = 'test_foo'},
+    } },
+  );
+
+This is very useful to set filters / selectors on the subscription.
+
+There are a few caveats, mostly summarized by "if you do confusing
+things, the program may not work".
+
+=over 4
+
+=item *
+
+you can have the C<stomp_destination> and the C<action_namespace>
+different in a single controller, but this may become confusing if you
+have more than one controller subscribed to the same destination; you
+can remove some of the confusion by restricting the kind of messages
+that each subscription receives
+
+=item *
+
+if you filter out some messages, don't be surprised if they are never
+received by your application
+
+=item *
+
+you can set persistent topic subscriptions, to prevent message loss
+during reconnects (the broker will remember your subscription and keep
+the messages while you are not connected):
+
+  MyApp->config(
+    Engine::Stomp' = {
+      'servers' => [
+       {
+         'hostname' => 'localhost',
+         'port' => '61613'
+       },
+       ],
+       connect_headers => {
+         'client-id' => 'myapp',
+       },
+    },
+  );
+
+  package MyApp::Controller::Persistent;
+  use Moose;
+  BEGIN { extends 'Catalyst::Controller::MessageDriven' };
+
+  has stomp_destination => (
+    is => 'ro',
+    isa => 'Str',
+    default => '/topic/important',
+  );
+
+  has stomp_subscribe_headers => (
+    is => 'ro',
+    isa => 'HashRef',
+    default => sub { +{
+      'activemq.subscriptionName' => 'important-subscription',
+    } },
+  );
+
+According to the ActiveMQ docs, the C<client-id> must be globally
+unique, and C<activemq.subscriptionName> must be unique within the
+client. Non-ActiveMQ brokers may use different headers to specify the
+subscription name.
+
+=back
 
 =head1 FAILOVER
 
@@ -147,6 +304,54 @@ Only after handling a request does it check the flag.
 
 =cut
 
+sub _qualify_destination {
+    my ($self,$unq_dest) = @_;
+
+    my $q_dest = $unq_dest;
+    if ($unq_dest !~ m{^ /? (?: queue | topic ) / }x) {
+        $q_dest = "/queue/$unq_dest";
+    }
+
+    # normalize slashes
+    $unq_dest =~ s{^/}{};
+    $q_dest =~ s{/+}{/};
+    $q_dest = "/$q_dest" unless $q_dest =~ m{^/};
+
+    return ($unq_dest,$q_dest);
+}
+
+sub _collect_destinations {
+    my ($self,$app) = @_;
+
+    my $sub_id=1;
+
+    my @dests;
+    for my $ctrl_name ($app->controllers) {
+        my $ctrl = $app->controller($ctrl_name);
+        my $dest_call = $ctrl->can('stomp_destination');
+        my $subh_call = $ctrl->can('stomp_subscribe_headers');
+        my ($unq_dest,$q_dest,$subh);
+        $unq_dest = $dest_call ? $ctrl->$dest_call() : $ctrl->action_namespace();
+        ($unq_dest,$q_dest) = $self->_qualify_destination($unq_dest);
+        $subh = $subh_call ? $ctrl->$subh_call() : { };
+
+        push @dests,{
+            destination => $q_dest,
+            subscribe_headers => {
+                %$subh,
+                id => $sub_id,
+            }
+        };
+
+        $self->destination_namespace_map->{$q_dest} =
+        $self->destination_namespace_map->{"/subscription/$sub_id"} =
+            $ctrl->action_namespace();
+        ++$sub_id;
+    }
+
+    return @dests;
+}
+
 sub run {
     my ($self, $app, $oneshot) = @_;
 
@@ -155,8 +360,7 @@ sub run {
     die 'No Engine::Stomp configuration found'
         unless ref $app->config->{'Engine::Stomp'} eq 'HASH';
 
-    my @queues = uniq grep { length $_ }
-                 map  { $app->controller($_)->action_namespace } $app->controllers;
+    my @destinations = $self->_collect_destinations($app);
 
     # connect up
     my $config = $app->config->{'Engine::Stomp'};
@@ -165,6 +369,12 @@ sub run {
     # munge the configuration to make it easier to write
     $config->{tries_per_server} ||= 1;
     $config->{connect_retry_delay} ||= 15;
+    for my $h (qw(connect subscribe)) {
+        $config->{"${h}_headers"} ||= {};
+        die("${h}_headers config for Engine::Stomp must be a hashref!\n")
+            if (ref($config->{"${h}_headers"}) ne 'HASH');
+    }
+
     if (! $config->{servers} ) {
         $config->{servers} = [ {
             hostname => (delete $config->{hostname}),
@@ -192,24 +402,48 @@ sub run {
 
         while ($tries < $config->{tries_per_server}) {
             ++$tries;
-    
-            eval {
-                my $subscribe_headers = $template{subscribe_headers} || {};
-                die("subscribe_headers config for Engine::Stomp must be a hashref!\n")
-                    if (ref($subscribe_headers) ne 'HASH');
 
-                $app->log->info("Connecting to STOMP Q at " . $template{hostname}.':'.$template{port});
+            eval {
+                for my $h (qw(connect subscribe)) {
+                    $template{"${h}_headers"} ||= {};
+                    die("${h}_headers config for for server $config->{hostname}:$config->{port} in Engine::Stomp must be a hashref!\n")
+                        if (ref($template{"${h}_headers"}) ne 'HASH');
+                }
+
+                my $per_server_connect_headers = {
+                    %{$config->{connect_headers}},
+                    %{$template{connect_headers}},
+                };
+
+                my $per_server_subscribe_headers = {
+                    %{$config->{subscribe_headers}},
+                    %{$template{subscribe_headers}},
+                };
+
+                $app->log->debug("Connecting to STOMP Q at " . $template{hostname}.':'.$template{port})
+                    if $app->debug;
 
                 $self->connection(Net::Stomp->new(\%template));
-                $self->connection->connect();
+                $self->connection->connect($per_server_connect_headers);
                 $self->conn_desc($template{hostname}.':'.$template{port});
 
                 # subscribe, with client ack.
-                foreach my $queue (@queues) {
-                    my $queue_name = "/queue/$queue";
+                foreach my $destination (@destinations) {
+                    my $dest_name = $destination->{destination};
+                    my $local_subscribe_headers =
+                        $destination->{subscribe_headers};
+                    my $id = $local_subscribe_headers->{id};
+                    $app->log->debug(
+                        "subscribing to $dest_name ($id) ".
+                        'which is mapped to '.
+                        $self->destination_namespace_map->{"/subscription/$id"}
+                    )
+                        if $app->debug;
+
                     $self->connection->subscribe({
-                        %$subscribe_headers,
-                        destination => $queue_name,
+                        %$per_server_subscribe_headers,
+                        %$local_subscribe_headers,
+                        destination => $dest_name,
                         ack         => 'client',
                     });
                 }
@@ -221,7 +455,7 @@ sub run {
                 while (1) {
                     my $frame = $self->connection->receive_frame(); # block
                     $self->handle_stomp_frame($app, $frame);
-            
+
                     if ( $ENV{ENGINE_ONESHOT} || $stop ){
                         # Perl does not like 'last QUITLOOP' inside an eval, hence we die and do it
                         die "QUITLOOP\n";
@@ -318,14 +552,21 @@ Dispatch a Stomp message into the Catalyst app.
 sub handle_stomp_message {
     my ($self, $app, $frame) = @_;
 
-    # queue -> controller
-    my $queue = $frame->headers->{destination};
-    my ($controller) = $queue =~ m|^/queue/(.*)$|;
+    # destination -> controller
+    my $destination = $frame->headers->{destination};
+    my $subscription = $frame->headers->{subscription};
+
+    $app->log->debug("message from $destination ($subscription)")
+        if $app->debug;
+
+    my $controller = $self->destination_namespace_map->{"/subscription/$subscription"}
+        || $self->destination_namespace_map->{$destination};
 
     # set up request
     my $config = $app->config->{'Engine::Stomp'};
     my $url = 'stomp://'.$config->{hostname}.':'.$config->{port}.'/'.$controller;
-    my $req = HTTP::Request->new(POST => $url);
+    my $request_headers = HTTP::Headers->new(%{$frame->headers});
+    my $req = HTTP::Request->new(POST => $url, $request_headers);
     $req->content($frame->body);
     $req->content_length(length $frame->body);
 
@@ -342,10 +583,23 @@ sub handle_stomp_message {
             $content = encode("utf8", $response->content); # create octets
         }
 
-        $self->connection->send({ destination => $reply_queue, body => $content });
+        my $reply_headers = $response->headers->clone;
+        $reply_headers->remove_content_headers;
+        my %reply_hh =
+            map {
+                lc($_), scalar($reply_headers->header($_)),
+            }
+            grep { !/^X-/i }
+            $reply_headers->header_field_names();
+
+        $self->connection->send({
+            %reply_hh,
+            destination => $reply_queue,
+            body => $content
+        });
     }
 
-    # ack the message off the queue now we've replied / processed
+    # ack the message off the destination now we've replied / processed
     $self->connection->ack( { frame => $frame } );
 }
 
