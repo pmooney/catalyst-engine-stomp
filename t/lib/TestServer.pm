@@ -16,10 +16,13 @@ use FindBin;
 
 our $ACTIVEMQ_VERSION = '5.2.0';
 
-our @EXPORT = qw/ start_server /;
+our @EXPORT = qw/ start_server check_amq_broker /;
 
-sub start_server {
-    my ($mq, $stomp);
+my $mq;
+
+sub check_amq_broker {
+    my ($stomp);
+
     eval {
         $stomp = Net::Stomp->new( { hostname => 'localhost', port => 61613 } );
     };
@@ -30,7 +33,7 @@ sub start_server {
             exit;
         }
 
-        $mq = Alien::ActiveMQ->run_server($ACTIVEMQ_VERSION);
+        $mq ||= Alien::ActiveMQ->run_server($ACTIVEMQ_VERSION);
 
         eval {
             $stomp = Net::Stomp->new( { hostname => 'localhost', port => 61613 } );
@@ -40,6 +43,12 @@ sub start_server {
             exit;
         }
     }
+
+    return $stomp;
+}
+
+sub start_server {
+    my $stomp = check_amq_broker();
 
     $SIG{CHLD} = 'IGNORE';
     unless (fork()) {
@@ -62,3 +71,4 @@ sub start_server {
     return $stomp;
 }
 
+1;

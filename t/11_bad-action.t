@@ -13,6 +13,8 @@ use FindBin;
 use lib "$FindBin::Bin/lib";
 use TestServer;
 
+check_amq_broker();
+
 plan tests => 24;
 
 sub test_it {
