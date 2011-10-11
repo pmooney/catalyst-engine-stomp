@@ -1,5 +1,12 @@
 Revision history for Perl extension Catalyst::Engine::Stomp.
 
+0.17  Wed  12 Oct  2011
+    - Thanks to dakkar for:
+    - it's now possible to subscribe to a topic, not just a queue
+    - you can specify additional subscription headers, at various levels
+    - the final dispatch (in Catalyst::Controller::MessageDriven) can
+      be directed by the (standard) JMSType header
+
 0.16  Fri  6 May 16:00 2011
     - Thanks to chiselwright for flushing the logs when an error is thrown
       and not using 100% CPU when unable to connect.

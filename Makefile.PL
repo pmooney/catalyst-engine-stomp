@@ -38,7 +38,7 @@ if ($Module::Install::AUTHOR) {
 }
 
 resources
-    'repository' => 'git://github.com/chrisa/catalyst-engine-stomp.git',
+    'repository' => 'git://github.com/pmooney/catalyst-engine-stomp.git',
     'license' => 'http://dev.perl.org/licenses/';
 
 install_script glob('script/*.pl');
