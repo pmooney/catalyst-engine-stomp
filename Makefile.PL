@@ -24,6 +24,7 @@ requires 'YAML::XS' => '0.32';
 requires 'YAML' => undef;
 requires 'Data::Serializer' => '0.49';
 requires 'namespace::autoclean' => '0.05';
+requires 'Clas::Load' => '0.20';
 
 test_requires 'Alien::ActiveMQ' => '0.00003';
 test_requires 'Catalyst::Plugin::ConfigLoader' => undef;
