@@ -1,5 +1,5 @@
 package CatalystX::Test::MessageDriven;
-use Class::MOP;
+use Class::Load;
 use Sub::Exporter;
 use HTTP::Request;
 
@@ -65,8 +65,8 @@ my $build_exports = sub {
         $request = sub { Catalyst::Exception->throw("Must specify a test app: use CatalystX::Test::MessageDriven 'TestApp'") };
     }
     else {
-        unless (Class::MOP::is_class_loaded($class)) {
-            Class::MOP::load_class($class);
+        unless (Class::Load::is_class_loaded($class)) {
+            Class::Load::load_class($class);
         }
         $class->import;
 
